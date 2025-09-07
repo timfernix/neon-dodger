@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Neon Dodger — Mini Game</title>
+  <meta name="description" content="Canvas arcade mini game. Dodge hazards, collect stars. Built for GitHub Pages." />
+  <style>
+    /* =========================================================
+       THEME
+    ========================================================= */
+    :root{
+      --bg:#050912;
+      --bg2:#0a0f1e;
+      --card:#0a0f23;
+      --accent:#00e7ff;
+      --accent2:#6cf9ff;
+      --danger:#ff4d4d;
+      --star:#ffd54a;
+      --text:#e8eefc;
+      --muted:#9fb0c9;
+      --border:#1b2444;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;
+      color:var(--text);
+      background:
+        radial-gradient(1600px 900px at 30% -10%, #121b39 0%, transparent 60%),
+        radial-gradient(1600px 900px at 110% 120%, #0f1a3a 0%, transparent 60%),
+        linear-gradient(180deg,var(--bg),var(--bg2));
+      display:flex; flex-direction:column; align-items:center; gap:16px; padding:16px;
+      overflow-x:hidden;
+      position:relative;
+      isolation:isolate; 
+    }
+
+    body::before,
+    body::after{
+      content:"";
+      position:fixed;
+      inset:-20%;
+      pointer-events:none;
+      z-index:-1;
+      filter: blur(40px);
+      opacity:.75;
+      mix-blend-mode:screen;
+      will-change: transform, opacity;
+      animation: float-1 28s ease-in-out infinite alternate;
+    }
+    body::before{
+      background:
+        radial-gradient(60% 40% at 35% 25%, rgba(0,231,255,.14), transparent 60%),
+        radial-gradient(40% 35% at 70% 80%, rgba(80,200,255,.10), transparent 60%);
+      transform: translate3d(-6%, -4%, 0) rotate(0deg);
+    }
+    body::after{
+      background:
+        radial-gradient(50% 35% at 70% 20%, rgba(168,85,247,.14), transparent 60%),
+        radial-gradient(35% 30% at 20% 85%, rgba(0,255,170,.10), transparent 60%);
+      animation: float-2 34s ease-in-out infinite alternate;
+      transform: translate3d(4%, 6%, 0) rotate(0deg);
+    }
+    @keyframes float-1{
+      0%{ transform: translate3d(-6%,-4%,0) rotate(0deg); opacity:.75 }
+      50%{ transform: translate3d(2%,2%,0) rotate(10deg); opacity:.9 }
+      100%{ transform: translate3d(-3%,5%,0) rotate(-8deg); opacity:.7 }
+    }
+    @keyframes float-2{
+      0%{ transform: translate3d(4%,6%,0) rotate(0deg); opacity:.75 }
+      50%{ transform: translate3d(-2%,-3%,0) rotate(-10deg); opacity:.95 }
+      100%{ transform: translate3d(6%,-1%,0) rotate(6deg); opacity:.7 }
+    }
+
+    header{
+      width:min(980px,100%);
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      position:relative;
+    }
+
+    header::after{
+      content:"";
+      position:absolute; left:0; right:0; bottom:-6px; height:2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      filter: drop-shadow(0 0 6px rgba(0,231,255,.7));
+      animation: sweep 3.6s linear infinite;
+      mask: linear-gradient(90deg, transparent 0 10%, #000 30% 70%, transparent 90% 100%);
+    }
+    @keyframes sweep{
+      0%{ transform: translateX(-30%) }
+      100%{ transform: translateX(30%) }
+    }
+
+    h1{ font-size:clamp(20px,3.2vw,28px); margin:0; letter-spacing:.5px; display:flex;align-items:center;gap:.6ch; }
+    h1 .dot{ width:.6em;height:.6em;border-radius:50%;background:var(--accent);box-shadow:0 0 18px var(--accent) }
+
+    .btn{
+      appearance:none;border:0;cursor:pointer;
+      padding:10px 14px;border-radius:12px;
+      background:linear-gradient(180deg, var(--accent), var(--accent2));
+      color:#021016;font-weight:700;letter-spacing:.2px;
+      box-shadow: 0 6px 16px rgba(0,231,255,.25);
+      transition:transform .06s ease, box-shadow .2s ease;
+    }
+    .btn:active{ transform:translateY(1px) scale(.995) }
+    .btn:hover{ box-shadow:0 10px 26px rgba(0,231,255,.35) }
+    .controls{ display:flex; gap:10px; flex-wrap:wrap }
+    .secondary{
+      background:linear-gradient(180deg,#18213f,#111a34);
+      color:var(--text);
+      box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 0 0 1px #23305a;
+    }
+
+    .wrap{
+      width:min(980px,100%);
+      background:linear-gradient(180deg,#080d1e,#070c1a);
+      border-radius:var(--radius);
+      padding:12px;
+      position:relative;
+      z-index:0;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+
+    .wrap::before{
+      content:"";
+      position:absolute; inset:-1px; border-radius:inherit; padding:1.5px;
+      background:
+        conic-gradient(from 0deg at 50% 50%,
+          rgba(0,231,255,.0) 0deg,
+          rgba(0,231,255,.6) 90deg,
+          rgba(168,85,247,.45) 180deg,
+          rgba(0,255,170,.5) 270deg,
+          rgba(0,231,255,.0) 360deg);
+      animation: spin 12s linear infinite;
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+              mask-composite: exclude;
+      pointer-events:none;
+      opacity:.6;
+      filter: drop-shadow(0 0 10px rgba(0,231,255,.35));
+    }
+    @keyframes spin{ to{ transform: rotate(360deg) } }
+
+    .stage{
+      position:relative;
+      aspect-ratio: 16/9;
+      width:100%;
+      border-radius:12px;
+      overflow:hidden;
+      background:
+        radial-gradient(600px 300px at 50% 105%, rgba(0,231,255,.2), transparent 60%),
+        linear-gradient(180deg,#070c1a,#060a16 50%, #050913);
+      outline:1px solid #132049;
+    }
+    canvas{
+      width:100%; height:100%; display:block;
+      filter: drop-shadow(0 0 18px rgba(0,231,255,.05));
+    }
+
+    /* ===== Futuristic moving grid via ::before ===== */
+    .stage::before{
+      content:"";
+      position:absolute; inset:0; pointer-events:none;
+      background:
+        repeating-linear-gradient( to right,
+          rgba(0,231,255,.06) 0 1px, transparent 1px 40px),
+        repeating-linear-gradient( to top,
+          rgba(0,231,255,.05) 0 1px, transparent 1px 40px);
+      transform: translateZ(0);
+      animation: grid-move 12s linear infinite;
+      mix-blend-mode: screen;
+    }
+    @keyframes grid-move{
+      0%{ background-position: 0 0, 0 0 }
+      100%{ background-position: 40px 40px, 40px 40px }
+    }
+
+    /* ===== Subtle scanlines via ::after ===== */
+    .stage::after{
+      content:"";
+      position:absolute; inset:0; pointer-events:none;
+      background:
+        repeating-linear-gradient( to bottom, rgba(255,255,255,.02) 0 2px, transparent 2px 4px );
+      opacity:.35;
+      mix-blend-mode: soft-light;
+    }
+
+    footer{
+      width:min(980px,100%);
+      color:var(--muted);
+      font-size:.95rem; line-height:1.35;
+      position:relative;
+    }
+    .kbd{
+      padding:.1rem .45rem; border:1px solid #2a3a66; border-bottom-width:2px; border-radius:6px;
+      background:#0f1733; color:#d7e4ff; font-weight:600; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .hint{
+      margin-left:auto; padding:8px 10px; border-radius:999px; font-size:.9rem; color:#cfe9ff;
+      background:linear-gradient(180deg,#14204a,#111a34); border:1px solid #23325c;
+    }
+    @media (max-width:600px){
+      .hint{display:none}
+      header{gap:8px}
+      .controls{gap:8px}
+      .btn{padding:9px 12px}
+    }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce){
+      body::before, body::after, .wrap::before, .stage::before{ animation: none }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="dot" aria-hidden="true"></span> Neon Dodger</h1>
+    <div class="controls">
+      <button id="start" class="btn">Start</button>
+      <button id="pause" class="btn secondary">Pause</button>
+      <button id="reset" class="btn secondary">Reset</button>
+      <div class="hint">Controls: <span class="kbd">←</span> <span class="kbd">→</span> / Drag</div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="stage">
+      <canvas id="game" aria-label="Neon Dodger Game Field" role="img"></canvas>
+    </div>
+  </div>
+
+  <footer>
+    Goal: Avoid <strong>red blocks</strong>, collect <strong>gold stars</strong>. Score from survival + stars. You have 3 lives.
+    <span class="kbd">Space</span> pauses, <span class="kbd">Enter</span> restarts. Touch/drag on mobile.
+  </footer>
+
+  <script>
+  (() => {
+    // ---------- Setup ----------
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
+    const state = {
+      scene: 'menu', // 'menu' | 'playing' | 'paused' | 'gameover'
+      score: 0,
+      timeAlive: 0,
+      high: Number(localStorage.getItem('neonDodgerHigh') || 0),
+      lives: 3,
+      lastT: 0,
+      spawnHazardIn: 0,
+      spawnStarIn: 0,
+      difficulty: 0, // scales with time
+      invul: 0,
+    };
+
+    const input = { left:false, right:false, pointerActive:false, pointerX:0 };
+
+    const world = {
+      w: 0, h: 0, groundY: 0,
+      hazards: [],
+      stars: [],
+      player: { x: 0, y: 0, w: 48, h: 16, speed: 420 }
+    };
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const cssW = canvas.clientWidth;
+      const cssH = canvas.clientHeight;
+      canvas.width  = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      world.w = cssW; world.h = cssH;
+      world.groundY = world.h - 50;
+      if (!initializedOnce) centerPlayer();
+    }
+
+    function centerPlayer(){
+      world.player.x = world.w/2;
+      world.player.y = world.groundY - world.player.h/2;
+    }
+
+    let initializedOnce = false;
+    resize();
+    new ResizeObserver(resize).observe(canvas);
+
+    // ---------- Entities ----------
+    function spawnHazard(){
+      const size = rand(20, 44);
+      const x = clamp(rand(size/2, world.w - size/2), size/2, world.w - size/2);
+      const vy = 160 + state.difficulty * 70 + rand(-20, 40);
+      world.hazards.push({ x, y: -size, size, vy });
+    }
+    function spawnStar(){
+      const size = rand(12, 18);
+      const x = clamp(rand(size, world.w - size), size, world.w - size);
+      const vy = 140 + state.difficulty * 60 + rand(-10, 30);
+      world.stars.push({ x, y: -size, size, vy, spin: rand(0, Math.PI*2) });
+    }
+
+    // ---------- Utilities ----------
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const rand = (a, b) => a + Math.random()*(b - a);
+    function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh){
+      return Math.abs(ax - bx) * 2 < (aw + bw) &&
+             Math.abs(ay - by) * 2 < (ah + bh);
+    }
+
+    // ---------- Drawing ----------
+    function drawBackground() {
+      const grad = ctx.createLinearGradient(0, world.groundY-40, 0, world.h);
+      grad.addColorStop(0, 'rgba(0,231,255,0.05)');
+      grad.addColorStop(1, 'rgba(0,231,255,0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, world.groundY-40, world.w, world.h);
+
+      // Grid backdrop (subtle, canvas-side)
+      ctx.strokeStyle = 'rgba(0,231,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const step = 40;
+      for (let x = 0; x < world.w; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, world.h); }
+      for (let y = 0; y < world.h; y += step) { ctx.moveTo(0, y); ctx.lineTo(world.w, y); }
+      ctx.stroke();
+    }
+
+    function drawPlayer() {
+      const p = world.player;
+      const r = 8;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,231,255,0.6)';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = '#0df';
+      roundRect(ctx, p.x - p.w/2, p.y - p.h/2, p.w, p.h, r);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#6cf9ff';
+      roundRect(ctx, p.x - p.w/2 + 6, p.y - p.h/2 + 4, p.w - 12, 4, 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (state.invul > 0 && Math.floor(state.invul*20)%2 === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        roundRect(ctx, p.x - p.w/2 -2, p.y - p.h/2 -2, p.w+4, p.h+4, r+1);
+        ctx.fill();
+      }
+    }
+
+    function roundRect(ctx, x, y, w, h, r){
+      const rr = Math.min(r, w/2, h/2);
+      ctx.beginPath();
+      ctx.moveTo(x+rr, y);
+      ctx.arcTo(x+w, y, x+w, y+h, rr);
+      ctx.arcTo(x+w, y+h, x, y+h, rr);
+      ctx.arcTo(x, y+h, x, y, rr);
+      ctx.arcTo(x, y, x+w, y, rr);
+      ctx.closePath();
+    }
+
+    function drawHazards(){
+      ctx.save();
+      for (const o of world.hazards) {
+        ctx.shadowColor = 'rgba(255,77,77,.5)';
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = '#ff4d4d';
+        ctx.fillRect(o.x - o.size/2, o.y - o.size/2, o.size, o.size);
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(255,200,200,.15)';
+        ctx.strokeRect(o.x - o.size/2+.5, o.y - o.size/2+.5, o.size-1, o.size-1);
+      }
+      ctx.restore();
+    }
+
+    function drawStar(x, y, r, rotation=0){
+      const spikes = 5, inner = r*0.5;
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(rotation);
+      ctx.beginPath();
+      let rot = Math.PI / 2 * 3;
+      let step = Math.PI / spikes;
+      ctx.moveTo(0, -r);
+      for (let i=0;i<spikes;i++){
+        ctx.lineTo(Math.cos(rot)*r, Math.sin(rot)*r);
+        rot += step;
+        ctx.lineTo(Math.cos(rot)*inner, Math.sin(rot)*inner);
+        rot += step;
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#ffd54a';
+      ctx.shadowColor = 'rgba(255,213,74,.6)';
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawStars(){ for (const s of world.stars) drawStar(s.x, s.y, s.size, s.spin); }
+
+    function drawHUD(){
+      ctx.save();
+      ctx.fillStyle = 'rgba(7,12,26,.7)';
+      ctx.fillRect(0,0,world.w,34);
+      ctx.fillStyle = '#cfe9ff';
+      ctx.font = '700 16px ui-sans-serif,system-ui,Segoe UI,Roboto';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillText(`Score: ${Math.floor(state.score).toString().padStart(5,' ')}`, 12, 17);
+      ctx.fillStyle = '#9ecfff';
+      const high = `High: ${Math.floor(state.high)}`;
+      ctx.fillText(high, Math.max(120, world.w/2 - ctx.measureText(high).width/2), 17);
+
+      const heart = (x,y) => {
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.fillStyle = '#ff6b8a';
+        ctx.beginPath();
+        ctx.moveTo(10, 6);
+        ctx.bezierCurveTo(10, 2, 6, 0, 5, 3);
+        ctx.bezierCurveTo(4, 0, 0, 2, 0, 6);
+        ctx.bezierCurveTo(0, 10, 5, 12, 5, 14);
+        ctx.bezierCurveTo(5, 12, 10, 10, 10, 6);
+        ctx.fill();
+        ctx.restore();
+      };
+      const startX = world.w - 80;
+      for (let i=0;i<3;i++){
+        ctx.globalAlpha = i < state.lives ? 1 : 0.25;
+        heart(startX + i*18, 9);
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    function drawOverlay(title, subtitle, hint){
+      ctx.save();
+      ctx.fillStyle = 'rgba(2,6,18,.55)';
+      ctx.fillRect(0,0,world.w,world.h);
+      const pad = 24, bw = Math.min(520, world.w - 40), bh = 170;
+      const bx = (world.w - bw)/2, by = (world.h - bh)/2;
+      ctx.fillStyle = 'rgba(8,12,26,.9)';
+      roundRect(ctx, bx, by, bw, bh, 14); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,231,255,.35)'; ctx.lineWidth = 2; ctx.stroke();
+
+      ctx.fillStyle = '#e8eefc';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.font = '700 28px ui-sans-serif,system-ui';
+      ctx.fillText(title, world.w/2, by + pad);
+
+      ctx.fillStyle = '#a7b0c4';
+      ctx.font = '16px ui-sans-serif,system-ui';
+      const lines = wrapText(ctx, subtitle, bw - pad*2);
+      let ty = by + pad + 38;
+      for (const line of lines){ ctx.fillText(line, world.w/2, ty); ty += 22; }
+
+      ctx.fillStyle = '#9ff0ff';
+      ctx.font = '600 14px ui-sans-serif,system-ui';
+      ctx.fillText(hint, world.w/2, by + bh - pad);
+      ctx.restore();
+    }
+
+    function wrapText(ctx, text, maxWidth){
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+      for (const w of words){
+        const test = (line? line + ' ' : '') + w;
+        if (ctx.measureText(test).width > maxWidth){
+          if (line) lines.push(line);
+          line = w;
+        } else line = test;
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    // ---------- Loop ----------
+    function loop(t){
+      const now = t ? t/1000 : 0;
+      const dt = Math.min(.033, state.lastT? now - state.lastT : 0);
+      state.lastT = now;
+
+      ctx.clearRect(0,0,world.w,world.h);
+      drawBackground();
+
+      if (state.scene === 'menu'){
+        drawOverlay('Neon Dodger',
+          'Dodge red blocks, collect stars. Use arrow keys or drag. Three lives — how long can you survive?',
+          'Press Start / Enter to play.');
+      }
+
+      if (state.scene === 'playing'){
+        update(dt);
+        drawStars(); drawHazards(); drawPlayer(); drawHUD();
+      }
+
+      if (state.scene === 'paused'){
+        drawStars(); drawHazards(); drawPlayer(); drawHUD();
+        drawOverlay('Paused', 'Take a breath. The grid waits politely.', 'Space to continue.');
+      }
+
+      if (state.scene === 'gameover'){
+        drawStars(); drawHazards(); drawPlayer(); drawHUD();
+        const best = Math.floor(state.high);
+        drawOverlay('Game Over',
+          `Score: ${Math.floor(state.score)}  ·  Best: ${best}`,
+          'Enter to restart · Arrows to move');
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt){
+      const p = world.player;
+
+      const dir = (input.left? -1 : 0) + (input.right? 1 : 0);
+      if (dir !== 0) p.x += dir * p.speed * dt;
+
+      if (input.pointerActive){
+        const blend = 0.35;
+        p.x = p.x*(1-blend) + input.pointerX*blend;
+      }
+
+      const margin = 14;
+      p.x = Math.max(margin + p.w/2, Math.min(world.w - margin - p.w/2, p.x));
+      p.y = world.groundY - p.h/2;
+
+      state.timeAlive += dt;
+      state.difficulty = Math.min(1, state.timeAlive / 60);
+      state.spawnHazardIn -= dt;
+      state.spawnStarIn -= dt;
+      if (state.spawnHazardIn <= 0){
+        spawnHazard();
+        const base = 0.9, min = 0.35;
+        state.spawnHazardIn = Math.max(min, base - state.difficulty*0.5) + (Math.random()*.2 - .1);
+      }
+      if (state.spawnStarIn <= 0){
+        spawnStar();
+        const base = 1.3, min = 0.55;
+        state.spawnStarIn = Math.max(min, base - state.difficulty*0.6) + (Math.random()*.2 - .1);
+      }
+
+      for (const o of world.hazards) o.y += o.vy * dt;
+      for (const s of world.stars){ s.y += s.vy * dt; s.spin += 3*dt; }
+
+      world.hazards = world.hazards.filter(o => o.y - o.size/2 < world.h + 40);
+      world.stars   = world.stars.filter(s => s.y - s.size   < world.h + 40);
+
+      if (state.invul > 0) state.invul -= dt;
+
+      for (let i = world.stars.length-1; i>=0; i--){
+        const s = world.stars[i];
+        if (aabbOverlap(p.x, p.y, p.w, p.h, s.x, s.y, s.size*1.2, s.size*1.2)){
+          world.stars.splice(i,1);
+          state.score += 10;
+        }
+      }
+
+      if (state.invul <= 0){
+        for (let i = world.hazards.length-1; i>=0; i--){
+          const o = world.hazards[i];
+          if (aabbOverlap(p.x, p.y, p.w, p.h, o.x, o.y, o.size, o.size)){
+            state.lives -= 1;
+            state.invul = 1.0;
+            p.x += (o.x < p.x ? 1 : -1)*20;
+            if (state.lives <= 0){ state.scene = 'gameover'; break; }
+          }
+        }
+      }
+
+      state.score += dt * 2.0;
+      if (state.score > state.high){
+        state.high = state.score;
+        localStorage.setItem('neonDodgerHigh', String(state.high));
+      }
+    }
+
+    function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh){
+      return Math.abs(ax - bx) * 2 < (aw + bw) &&
+             Math.abs(ay - by) * 2 < (ah + bh);
+    }
+
+    function startGame(){
+      state.scene = 'playing';
+      state.score = 0;
+      state.timeAlive = 0;
+      state.lives = 3;
+      state.spawnHazardIn = 0.2;
+      state.spawnStarIn = 0.6;
+      state.invul = 1.0;
+      world.hazards.length = 0;
+      world.stars.length = 0;
+      centerPlayer();
+      if (!initializedOnce) initializedOnce = true;
+    }
+
+    function pauseToggle(){
+      if (state.scene === 'playing'){ state.scene = 'paused'; }
+      else if (state.scene === 'paused'){ state.scene = 'playing'; }
+    }
+
+    // ---------- Input ----------
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
+      if (e.code === 'Space'){ e.preventDefault(); if (state.scene !== 'menu') pauseToggle(); }
+      if (e.code === 'Enter'){
+        if (state.scene === 'menu' || state.scene === 'gameover') startGame();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
+    });
+
+    function pointerPos(ev){
+      const rect = canvas.getBoundingClientRect();
+      const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+      return Math.max(0, Math.min(rect.width, x));
+    }
+    canvas.addEventListener('pointerdown', (e)=>{ input.pointerActive = true; input.pointerX = pointerPos(e); if (state.scene==='menu' || state.scene==='gameover') startGame(); });
+    canvas.addEventListener('pointermove', (e)=>{ if (input.pointerActive) input.pointerX = pointerPos(e); });
+    window.addEventListener('pointerup', ()=>{ input.pointerActive = false; });
+
+    document.getElementById('start').addEventListener('click', () => { if (state.scene !== 'playing') startGame(); });
+    document.getElementById('pause').addEventListener('click', () => { if (state.scene === 'playing' || state.scene==='paused') pauseToggle(); });
+    document.getElementById('reset').addEventListener('click', () => startGame());
+
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>
